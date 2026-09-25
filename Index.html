@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nuit Étoilée - Helvetipix</title>
+<style>
+body { font-family: sans-serif; background-color: #0b0c10; color: #c5c6c7; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+.card { background-color: #1f2833; border-radius: 12px; padding: 25px; max-width: 500px; width: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid #45a29e; }
+h2 { color: #66fcf1; text-align: center; margin-top: 0; }
+.section { margin-bottom: 20px; border-bottom: 1px solid #45a29e; padding-bottom: 15px; }
+.section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.label { font-size: 0.9em; color: #45a29e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+.value { font-size: 1.1em; font-weight: bold; color: #ffffff; }
+.score { font-size: 1.4em; text-align: center; padding: 10px; border-radius: 8px; margin-top: 10px; }
+.film { font-style: italic; color: #c5c6c7; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px; margin-top: 10px; }
+.loading { color: #45a29e; font-style: italic; }
+.error { color: #ff6b6b; }
+</style>
+</head>
+<body>
+
+<div class="card" id="app">
+<h2>🌙 Nuit Étoilée</h2>
+<div id="content">
+<p class="loading">Chargement des données...</p>
+</div>
+</div>
+
+<script>
+// Configuration
+// Remplacez par les coordonnées du spot du jour si vous le souhaitez.
+// Exemple pour Lausanne : lat=46.5197, lon=6.6323
+const SPOT_LAT = 46.5197;
+const SPOT_LON = 6.6323;
+
+// Liste de films pour les soirées nuageuses
+const FILMS = [
+"Blade Runner (1982)",
+"Interstellar (2014)",
+"Contact (1997)",
+"Gravity (2013)",
+"The Martian (2015)",
+"Le Cinquième Élément (1997)",
+"Dune (2021)"
+ ];
+
+const appContent = document.getElementById('content');
+
+// Fonction pour calculer le score photo (0 à 100)
+// Basé sur : Couverture nuageuse (plus c'est bas, mieux c'est)
+// et Visibilité (si disponible)
+function calculatePhotoScore(cloudCover) {
+if (cloudCover === null || cloudCover === undefined) return 0;
+// Score simple : 100 - % nuages
+let score = 100 - cloudCover;
+if (score < 0) score = 0;
+return Math.round(score);
+}
+
+// Fonction pour obtenir une suggestion de film
+function getFilmSuggestion() {
+return FILMS[Math.floor(Math.random() * FILMS.length)];
+}
+
+// Fonction principale pour récupérer la météo
+async function fetchWeather(lat, lon, label) {
+const url = https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=cloud_cover,visibility&timezone=auto;
+try {
+const response = await fetch(url);
+const data = await response.json();
+if (data.error) throw new Error(data.reason);
+
+const current = data.current;
+return {
+label: label,
+cloudCover: current.cloud_cover,
+visibility: current.visibility ? (current.visibility / 1000).toFixed(1) : "N/A", // converti en km
+score: calculatePhotoScore(current.cloud_cover)
+};
+} catch (error) {
+console.error("Erreur météo:", error);
+return { label: label, error: true };
+}
+}
+
+// Fonction pour afficher le HTML
+function displayData(myWeather, spotWeather) {
+let html = '';
+
+// --- Section Ma Position ---
+html += <div class="section">;
+html += <div class="label"&gt;📍 Ma position&lt;/div>;
+if (myWeather.error) {
+html += <p class="error"&gt;Impossible de charger la météo.&lt;/p>;
+} else {
+html += <div class="value"&gt;Nuages : ${myWeather.cloudCover}%</div>; html +=<div class="score" style="background: ${myWeather.score &gt; 50 ? '#45a29e' : '#ff6b6b'}; color: #0b0c10;"&gt;Score Photo : ${myWeather.score}/100</div>; } html +=`;
+
+// --- Section Spot du Jour ---
+html += <div class="section">;
+html += <div class="label"&gt;📸 Spot du jour&lt;/div>;
+if (spotWeather.error) {
+html += <p class="error"&gt;Impossible de charger la météo du spot.&lt;/p>;
+} else {
+html += <div class="value"&gt;Nuages :${spotWeather.cloudCover}%</div>; html +=<div class="score" style="background: latex
+{spotWeather.score &gt; 50 ? '#45a29e' : '#ff6b6b'}; color: #0b0c10;"&gt;Score Photo : 
+
+{spotWeather.score}/100</div>; } html +=`;
+
+// --- Suggestion de film ---
+// On propose un film si les deux scores sont mauvais (< 40)
+const myScore = myWeather.score || 0;
+const spotScore = spotWeather.score || 0;
+
+if (myScore < 40 && spotScore < 40) {
+html += <div class="section">;
+html += <div class="label"&gt;🍿 Soirée Nuageuse&lt;/div>;
+html += <div class="film"&gt;Et si on regardait : &lt;strong&gt;${getFilmSuggestion()}&lt;/strong&gt; ?&lt;/div>;
+html += </div>;
+}
+
+appContent.innerHTML = html;
+}
+
+// Initialisation
+async function init() {
+// 1. Géolocalisation de l'utilisateur
+if (navigator.geolocation) {
+navigator.geolocation.getCurrentPosition(
+async (position) => {
+const myLat = position.coords.latitude;
+const myLon = position.coords.longitude;
+
+// 2. Récupérer les deux météos en parallèle
+const [myW, spotW] = await Promise.all([
+fetchWeather(myLat, myLon, "Ma Position"),
+fetchWeather(SPOT_LAT, SPOT_LON, "Spot du Jour")
+ ]);
+
+displayData(myW, spotW);
+},
+(error) => {
+console.warn("Géolocalisation refusée ou échouée.");
+// Si refus, on affiche juste le spot du jour
+fetchWeather(SPOT_LAT, SPOT_LON, "Spot du Jour").then(spotW => {
+displayData({error: true}, spotW);
+});
+}
+);
+} else {
+// Pas de support géolocalisation, on affiche juste le spot
+fetchWeather(SPOT_LAT, SPOT_LON, "Spot du Jour").then(spotW => {
+displayData({error: true}, spotW);
+});
+}
+}
+
+init();
+</script>
+
+</body>
+</html>
